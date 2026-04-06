@@ -162,6 +162,44 @@ class OdooProtocol:
             )
         return result[0]
 
+    async def search_tags(
+        self,
+        project_id: int | None = None,
+        query: str = "",
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        context = {**self._config.context}
+        if project_id is not None:
+            context["project_id"] = project_id
+        results = await self._transport.call_kw(
+            model="project.tags",
+            method="name_search",
+            args=[],
+            kwargs={
+                "name": query,
+                "operator": "ilike",
+                "args": [],
+                "limit": limit,
+                "context": context,
+            },
+        )
+        tags = []
+        if results:
+            ids = [r[0] for r in results]
+            tags = await self._transport.call_kw(
+                model="project.tags",
+                method="web_read",
+                args=[ids],
+                kwargs={
+                    "context": self._config.context,
+                    "specification": {
+                        "display_name": {},
+                        "color": {},
+                    },
+                },
+            )
+        return tags
+
     async def list_projects(self) -> list[dict[str, Any]]:
         result = await self._transport.call_kw(
             model="project.project",

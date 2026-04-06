@@ -133,6 +133,24 @@ async def resource_project_stages(project_id: int) -> str:
     return "\n".join(lines)
 
 
+@mcp.resource("odoo://project/{project_id}/tags")
+async def resource_project_tags(project_id: int) -> str:
+    """Теги, доступные в проекте."""
+    svc = _get_service()
+    try:
+        tags = await svc.search_tags(project_id=project_id)
+    except PermissionError as e:
+        return f"Ошибка доступа: {e}"
+    except Exception as e:
+        return f"Ошибка: {e}"
+    if not tags:
+        return f"Проект {project_id}: теги не найдены."
+    lines = [f"Теги проекта {project_id}:"]
+    for t in tags:
+        lines.append(f"- ID {t.id} | {t.name} | цвет {t.color}")
+    return "\n".join(lines)
+
+
 @mcp.resource("odoo://task/{task_id}")
 async def resource_task(task_id: int) -> str:
     """Данные задачи (read-only)."""

@@ -14,7 +14,7 @@ from mcp_odoo_jsonrpc.acl.protocol import (
 )
 from mcp_odoo_jsonrpc.acl.transport import OdooTransport
 from mcp_odoo_jsonrpc.config import OdooConfig
-from mcp_odoo_jsonrpc.domain.models import Project, Stage, Task
+from mcp_odoo_jsonrpc.domain.models import Project, Stage, Tag, Task
 
 
 class OdooTaskService:
@@ -41,6 +41,21 @@ class OdooTaskService:
                 id=r["id"],
                 name=r.get("display_name", ""),
                 task_count=r.get("task_count", 0),
+            )
+            for r in raw
+        ]
+
+    async def search_tags(
+        self,
+        project_id: int | None = None,
+        query: str = "",
+    ) -> list[Tag]:
+        raw = await self._protocol.search_tags(project_id=project_id, query=query)
+        return [
+            Tag(
+                id=r["id"],
+                name=r.get("display_name", ""),
+                color=r.get("color", 0),
             )
             for r in raw
         ]
