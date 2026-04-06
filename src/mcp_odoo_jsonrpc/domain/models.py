@@ -8,6 +8,7 @@ from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState
 class Project(BaseModel, frozen=True):
     id: int
     name: str
+    task_count: int = 0
 
 
 class Stage(BaseModel, frozen=True):

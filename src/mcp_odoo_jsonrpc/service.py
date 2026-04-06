@@ -14,7 +14,7 @@ from mcp_odoo_jsonrpc.acl.protocol import (
 )
 from mcp_odoo_jsonrpc.acl.transport import OdooTransport
 from mcp_odoo_jsonrpc.config import OdooConfig
-from mcp_odoo_jsonrpc.domain.models import Stage, Task
+from mcp_odoo_jsonrpc.domain.models import Project, Stage, Task
 
 
 class OdooTaskService:
@@ -33,6 +33,17 @@ class OdooTaskService:
 
     async def validate_session(self) -> dict[str, Any]:
         return await self._protocol.validate_session()
+
+    async def list_projects(self) -> list[Project]:
+        raw = await self._protocol.list_projects()
+        return [
+            Project(
+                id=r["id"],
+                name=r.get("display_name", ""),
+                task_count=r.get("task_count", 0),
+            )
+            for r in raw
+        ]
 
     async def list_tasks(
         self,

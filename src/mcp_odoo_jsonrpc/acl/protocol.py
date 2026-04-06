@@ -162,6 +162,21 @@ class OdooProtocol:
             )
         return result[0]
 
+    async def list_projects(self) -> list[dict[str, Any]]:
+        result = await self._transport.call_kw(
+            model="project.project",
+            method="search_read",
+            args=[],
+            kwargs={
+                "domain": [],
+                "fields": ["display_name", "task_count"],
+                "context": self._config.context,
+            },
+        )
+        if self._allowed_projects:
+            result = [r for r in result if r["id"] in self._allowed_projects]
+        return result
+
     async def search_tasks(
         self,
         domain: list[Any] | None = None,

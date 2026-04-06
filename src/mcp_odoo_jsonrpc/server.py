@@ -100,6 +100,81 @@ def _format_task(task: Task, restricted: bool) -> str:
     return "\n".join(lines)
 
 
+# --- Resources (read-only) ---
+
+
+@mcp.resource("odoo://projects")
+async def resource_projects() -> str:
+    """Список доступных проектов Odoo."""
+    svc = _get_service()
+    projects = await svc.list_projects()
+    lines = [f"Проекты ({len(projects)}):"]
+    for p in projects:
+        lines.append(f"- ID {p.id} | {p.name} | {p.task_count} задач")
+    return "\n".join(lines)
+
+
+@mcp.resource("odoo://project/{project_id}/stages")
+async def resource_project_stages(project_id: int) -> str:
+    """Стадии (Kanban-колонки) проекта."""
+    svc = _get_service()
+    try:
+        stages = await svc.get_task_stages(project_id)
+    except PermissionError as e:
+        return f"Ошибка доступа: {e}"
+    except Exception as e:
+        return f"Ошибка: проект {project_id} не найден или недоступен. {e}"
+    if not stages:
+        return f"Проект {project_id}: стадии не найдены."
+    lines = [f"Стадии проекта {project_id}:"]
+    for s in stages:
+        fold = " (свёрнута)" if s.folded else ""
+        lines.append(f"- ID {s.id} | {s.name}{fold}")
+    return "\n".join(lines)
+
+
+@mcp.resource("odoo://task/{task_id}")
+async def resource_task(task_id: int) -> str:
+    """Данные задачи (read-only)."""
+    svc = _get_service()
+    try:
+        task = await svc.get_task(task_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
+    return _format_task(task, restricted=svc.is_restricted)
+
+
+@mcp.resource("odoo://task/{task_id}/timesheets")
+async def resource_task_timesheets(task_id: int) -> str:
+    """Трудозатраты задачи (read-only)."""
+    svc = _get_service()
+    try:
+        task = await svc.get_timesheets(task_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
+    restricted = svc.is_restricted
+    lines = [
+        f"Трудозатраты по "
+        f"{'ID ' + str(task.id) if restricted else '[' + str(task.id) + '] ' + task.name}",
+        f"Часы: {task.effective_hours:.1f}/{task.allocated_hours:.1f}"
+        f" | Прогресс: {task.progress:.0%}",
+    ]
+    if not task.timesheets:
+        lines.append("Записей нет.")
+    else:
+        for ts in task.timesheets:
+            if restricted:
+                lines.append(f"- {ts.date} | {ts.hours:.2f}ч")
+            else:
+                lines.append(
+                    f"- {ts.date} | {ts.employee.name} | {ts.hours:.2f}ч | {ts.description}"
+                )
+    return "\n".join(lines)
+
+
+# --- Tools (read-write) ---
+
+
 @mcp.tool()
 async def list_tasks(
     project_id: int | None = None,
