@@ -266,6 +266,7 @@ async def update_task(
     description: str | None = None,
     priority: str | None = None,
     deadline: str | None = None,
+    allocated_hours: float | None = None,
     assignee_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
 ) -> str:
@@ -277,6 +278,7 @@ async def update_task(
         description: Новое описание
         priority: Приоритет ("0" — обычный, "1" — срочный)
         deadline: Дедлайн (формат YYYY-MM-DD или None для сброса)
+        allocated_hours: Запланированные часы (например 5.0, 9.0)
         assignee_ids: Новый список исполнителей (заменяет текущих)
         tag_ids: Новый список тегов (заменяет текущие)
     """
@@ -287,6 +289,7 @@ async def update_task(
         description=description,
         priority=priority,
         deadline=deadline,
+        allocated_hours=allocated_hours,
         assignee_ids=assignee_ids,
         tag_ids=tag_ids,
     )

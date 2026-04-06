@@ -111,6 +111,7 @@ class OdooTaskService:
         description: str | None = None,
         priority: str | None = None,
         deadline: str | None = None,
+        allocated_hours: float | None = None,
         assignee_ids: list[int] | None = None,
         tag_ids: list[int] | None = None,
     ) -> Task:
@@ -123,6 +124,8 @@ class OdooTaskService:
             values["priority"] = priority
         if deadline is not None:
             values["date_deadline"] = deadline
+        if allocated_hours is not None:
+            values["allocated_hours"] = allocated_hours
         if assignee_ids is not None:
             values["user_ids"] = [[6, 0, assignee_ids]]
         if tag_ids is not None:
