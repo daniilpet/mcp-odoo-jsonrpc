@@ -67,6 +67,16 @@ def _format_task(task: Task, restricted: bool) -> str:
         lines.append(f"Подзадачи: {task.closed_subtask_count}/{task.subtask_count}")
     if task.description:
         lines.append(f"\n## Описание\n{task.description}")
+    if task.subtasks:
+        lines.append("\n## Подзадачи")
+        for st in task.subtasks:
+            assignee = ", ".join(u.name for u in st.assignees) if st.assignees else ""
+            dl = f" | Дедлайн: {st.deadline}" if st.deadline else ""
+            lines.append(
+                f"- [{st.id}] {st.name} "
+                f"| {st.stage.name} "
+                f"| {st.priority.name}{dl}" + (f" | {assignee}" if assignee else "")
+            )
     if task.timesheets:
         lines.append("\n## Трудозатраты")
         for ts in task.timesheets:

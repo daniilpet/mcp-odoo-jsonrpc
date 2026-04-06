@@ -31,6 +31,24 @@ TASK_LIST_SPEC: dict[str, Any] = {
 TASK_DETAIL_SPEC: dict[str, Any] = {
     **TASK_LIST_SPEC,
     "description": {},
+    "child_ids": {
+        "fields": {
+            "name": {},
+            "state": {},
+            "stage_id": {"fields": {"display_name": {}}},
+            "user_ids": {
+                "fields": {"display_name": {}},
+                "context": {"active_test": False},
+            },
+            "priority": {},
+            "date_deadline": {},
+            "allocated_hours": {},
+            "effective_hours": {},
+            "progress": {},
+        },
+        "limit": 80,
+        "order": "sequence ASC, id ASC",
+    },
     "timesheet_ids": {
         "fields": {
             "readonly_timesheet": {},
