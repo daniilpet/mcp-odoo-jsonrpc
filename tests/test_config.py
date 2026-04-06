@@ -1,6 +1,4 @@
-import os
-
-from mcp_odoo_jsonrpc.config import TrustMode, _parse_trust_mode, _parse_allowed_projects
+from mcp_odoo_jsonrpc.config import TrustMode, _parse_allowed_projects, _parse_trust_mode
 
 
 def test_trust_mode_default_restricted(monkeypatch):
