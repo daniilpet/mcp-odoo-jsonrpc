@@ -13,6 +13,7 @@ MCP Odoo JSON-RPC в формате MADR (Markdown Any Decision Records).
 | ADR-004 | Accepted | Dev-mode — разведка эндпоинтов   |
 | ADR-005 | Accepted | Модель безопасности              |
 | ADR-006 | Accepted | CLI → Service Layer (гибрид)     |
+| ADR-007 | Accepted | Отказ от универсального execute   |
 
 ## Формат
 
