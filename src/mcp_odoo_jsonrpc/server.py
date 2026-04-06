@@ -352,6 +352,26 @@ async def log_timesheet(
 
 
 @mcp.tool()
+async def post_comment(
+    task_id: int,
+    body: str,
+    internal: bool = False,
+) -> str:
+    """Оставить комментарий к задаче.
+
+    Args:
+        task_id: ID задачи
+        body: Текст комментария
+        internal: Внутренняя заметка (True) или публичный комментарий (False)
+    """
+    svc = _get_service()
+    msg = await svc.post_comment(task_id=task_id, body=body, internal=internal)
+    msg_id = msg.get("id", "?")
+    note_type = "Заметка" if internal else "Комментарий"
+    return f"{note_type} #{msg_id} добавлен к задаче {task_id}"
+
+
+@mcp.tool()
 async def get_timesheets(task_id: int) -> str:
     """Получить трудозатраты по задаче.
 

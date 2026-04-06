@@ -278,6 +278,31 @@ class OdooProtocol:
             },
         )
 
+    async def post_message(
+        self,
+        task_id: int,
+        body: str,
+        message_type: str = "comment",
+        subtype: str = "mail.mt_comment",
+    ) -> dict[str, Any]:
+        context = {
+            **self._config.context,
+            "mail_post_autofollow": True,
+        }
+        return await self._transport.call(
+            "/mail/message/post",
+            {
+                "thread_id": task_id,
+                "thread_model": "project.task",
+                "post_data": {
+                    "body": body,
+                    "message_type": message_type,
+                    "subtype_xmlid": subtype,
+                },
+                "context": context,
+            },
+        )
+
     async def get_messages(
         self,
         task_id: int,

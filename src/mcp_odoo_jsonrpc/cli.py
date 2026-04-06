@@ -87,10 +87,15 @@ def _print_task_detail(task: Task) -> None:
 def _show_task_actions() -> str:
     console.print(
         "\n  [cyan]d[/] — детали  [cyan]t[/] — трудозатраты  "
-        "[cyan]l[/] — списать время  [cyan]s[/] — сменить стадию  "
+        "[cyan]l[/] — списать время  [cyan]s[/] — сменить стадию\n"
+        "  [cyan]c[/] — комментарий  [cyan]n[/] — заметка  "
         "[cyan]b[/] — назад"
     )
-    return Prompt.ask("Действие", choices=["d", "t", "l", "s", "b"], default="d")
+    return Prompt.ask(
+        "Действие",
+        choices=["d", "t", "l", "s", "c", "n", "b"],
+        default="d",
+    )
 
 
 async def _task_context_loop(task: Task, svc: OdooTaskService) -> None:
@@ -152,6 +157,17 @@ async def _task_context_loop(task: Task, svc: OdooTaskService) -> None:
                     console.print("[red]Неверный номер[/]")
             except ValueError:
                 console.print("[red]Введите номер стадии[/]")
+
+        elif action in ("c", "n"):
+            internal = action == "n"
+            label = "Заметка (внутренняя)" if internal else "Комментарий"
+            body = Prompt.ask(label)
+            if body.strip():
+                msg = await svc.post_comment(task.id, body, internal=internal)
+                msg_id = msg.get("id", "?")
+                console.print(f"[green]{label} #{msg_id} добавлен[/]")
+            else:
+                console.print("[dim]Пустой текст, отмена[/]")
 
 
 async def _tasks_loop(svc: OdooTaskService) -> None:

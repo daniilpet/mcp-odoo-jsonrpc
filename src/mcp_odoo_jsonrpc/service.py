@@ -172,6 +172,25 @@ class OdooTaskService:
         )
         return translate_task(record)
 
+    async def post_comment(
+        self,
+        task_id: int,
+        body: str,
+        internal: bool = False,
+    ) -> dict:
+        subtype = "mail.mt_note" if internal else "mail.mt_comment"
+        msg_type = "comment"
+        result = await self._protocol.post_message(
+            task_id=task_id,
+            body=body,
+            message_type=msg_type,
+            subtype=subtype,
+        )
+        messages = result.get("mail.message", [])
+        if messages:
+            return messages[0]
+        return result
+
     async def get_timesheets(self, task_id: int) -> Task:
         record = await self._protocol.read_task(task_id)
         return translate_task(record)
