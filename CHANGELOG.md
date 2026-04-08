@@ -1,12 +1,36 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
+версионирование следует [Semantic Versioning](https://semver.org/lang/ru/).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/).
+## [0.2.0] - 2026-04-08
+
+### Added
+
+- Поддержка подзадач (`child_ids`) в `get_task` и вложенных задач
+- MCP Resources: `odoo://user/tasks`, `odoo://project/{id}/tasks`,
+  `odoo://task/{id}`, `odoo://task/{id}/timesheets`
+- Инструмент `post_comment` для комментариев и внутренних заметок
+- Поле `allocated_hours` в `update_task`
+- Resource `odoo://project/{id}/tags` и инструмент `search_tags`
+- Dockerfile для контейнерного запуска MCP-сервера
+- 25 unit-тестов для mapper и config (без обращений к продакшену)
+
+### Changed
+
+- ADR-007: отказ от универсального `execute` tool в пользу
+  специализированных инструментов
+- ADR-008: masked mode с категорийной анонимизацией данных
+
+### Fixed
+
+- Удалён неиспользуемый import `os` в `test_config`
+- Форматирование `test_mapper.py` приведено к стандарту ruff
 
 ## [0.1.0] - 2026-04-05
 
 ### Added
+
 - MCP-сервер с 7 инструментами: list_tasks, get_task, create_task,
   update_task, change_task_stage, log_timesheet, get_timesheets
 - Odoo CLI с интерактивным меню и браузерной авторизацией
@@ -18,3 +42,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - 11 доменных моделей (Pydantic v2)
 - 5 архитектурных решений (ADR)
 - Справочник из 9 Odoo JSON-RPC эндпоинтов
+
+[0.2.0]: https://github.com/daniilpet/mcp-odoo-jsonrpc/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/daniilpet/mcp-odoo-jsonrpc/releases/tag/v0.1.0
