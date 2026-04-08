@@ -8,6 +8,7 @@ from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState
 class Project(BaseModel, frozen=True):
     id: int
     name: str
+    task_count: int = 0
 
 
 class Stage(BaseModel, frozen=True):
@@ -67,6 +68,19 @@ class Message(BaseModel, frozen=True):
     tracking: list[FieldChange] = Field(default_factory=list)
 
 
+class Subtask(BaseModel, frozen=True):
+    id: int
+    name: str
+    state: TaskState
+    stage: Stage
+    priority: TaskPriority
+    assignees: list[User] = Field(default_factory=list)
+    deadline: date | None = None
+    allocated_hours: float = 0.0
+    effective_hours: float = 0.0
+    progress: float = 0.0
+
+
 class Attachment(BaseModel, frozen=True):
     id: int
     name: str
@@ -96,6 +110,7 @@ class Task(BaseModel, frozen=True):
     progress: float = 0.0
     subtask_count: int = 0
     closed_subtask_count: int = 0
+    subtasks: list[Subtask] = Field(default_factory=list)
     duration_tracking: dict[int, int] = Field(default_factory=dict)
     timesheets: list[Timesheet] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)

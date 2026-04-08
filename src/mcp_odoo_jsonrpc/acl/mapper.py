@@ -10,6 +10,7 @@ from mcp_odoo_jsonrpc.domain.models import (
     Partner,
     Project,
     Stage,
+    Subtask,
     Tag,
     Task,
     TaskRef,
@@ -69,6 +70,23 @@ def translate_task(record: dict[str, Any]) -> Task:
             )
         )
 
+    subtasks = []
+    for child in record.get("child_ids") or []:
+        subtasks.append(
+            Subtask(
+                id=child["id"],
+                name=child.get("name", ""),
+                state=TaskState.from_odoo(child.get("state", "01_in_progress")),
+                stage=_parse_ref(child.get("stage_id"), Stage) or Stage(id=0, name="Unknown"),
+                priority=TaskPriority.from_odoo(child.get("priority", "0")),
+                assignees=_parse_ref_list(child.get("user_ids"), User),
+                deadline=_parse_date(child.get("date_deadline")),
+                allocated_hours=child.get("allocated_hours", 0.0),
+                effective_hours=child.get("effective_hours", 0.0),
+                progress=child.get("progress", 0.0),
+            )
+        )
+
     duration_tracking = {}
     raw_tracking = record.get("duration_tracking")
     if raw_tracking and isinstance(raw_tracking, dict):
@@ -95,6 +113,7 @@ def translate_task(record: dict[str, Any]) -> Task:
         progress=record.get("progress", 0.0),
         subtask_count=record.get("subtask_count", 0),
         closed_subtask_count=record.get("closed_subtask_count", 0),
+        subtasks=subtasks,
         duration_tracking=duration_tracking,
         timesheets=timesheets,
     )

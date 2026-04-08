@@ -62,6 +62,38 @@ mcp-odoo-cli
 }
 ```
 
+### Docker
+
+```bash
+docker build -t mcp-odoo .
+```
+
+```json
+{
+  "mcpServers": {
+    "odoo": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "ODOO_BASE_URL",
+        "-e", "ODOO_SESSION_ID",
+        "-e", "ODOO_UID",
+        "-e", "ODOO_COMPANY_IDS",
+        "-e", "ODOO_TRUST_MODE",
+        "mcp-odoo"
+      ],
+      "env": {
+        "ODOO_BASE_URL": "https://odoo.example.com",
+        "ODOO_SESSION_ID": "your_session_id",
+        "ODOO_UID": "1",
+        "ODOO_COMPANY_IDS": "1",
+        "ODOO_TRUST_MODE": "restricted"
+      }
+    }
+  }
+}
+```
+
 ## Возможности
 
 | Инструмент           | Описание                                     |

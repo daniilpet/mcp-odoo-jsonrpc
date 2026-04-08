@@ -31,6 +31,24 @@ TASK_LIST_SPEC: dict[str, Any] = {
 TASK_DETAIL_SPEC: dict[str, Any] = {
     **TASK_LIST_SPEC,
     "description": {},
+    "child_ids": {
+        "fields": {
+            "name": {},
+            "state": {},
+            "stage_id": {"fields": {"display_name": {}}},
+            "user_ids": {
+                "fields": {"display_name": {}},
+                "context": {"active_test": False},
+            },
+            "priority": {},
+            "date_deadline": {},
+            "allocated_hours": {},
+            "effective_hours": {},
+            "progress": {},
+        },
+        "limit": 80,
+        "order": "sequence ASC, id ASC",
+    },
     "timesheet_ids": {
         "fields": {
             "readonly_timesheet": {},
@@ -144,6 +162,59 @@ class OdooProtocol:
             )
         return result[0]
 
+    async def search_tags(
+        self,
+        project_id: int | None = None,
+        query: str = "",
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        context = {**self._config.context}
+        if project_id is not None:
+            context["project_id"] = project_id
+        results = await self._transport.call_kw(
+            model="project.tags",
+            method="name_search",
+            args=[],
+            kwargs={
+                "name": query,
+                "operator": "ilike",
+                "args": [],
+                "limit": limit,
+                "context": context,
+            },
+        )
+        tags = []
+        if results:
+            ids = [r[0] for r in results]
+            tags = await self._transport.call_kw(
+                model="project.tags",
+                method="web_read",
+                args=[ids],
+                kwargs={
+                    "context": self._config.context,
+                    "specification": {
+                        "display_name": {},
+                        "color": {},
+                    },
+                },
+            )
+        return tags
+
+    async def list_projects(self) -> list[dict[str, Any]]:
+        result = await self._transport.call_kw(
+            model="project.project",
+            method="search_read",
+            args=[],
+            kwargs={
+                "domain": [],
+                "fields": ["display_name", "task_count"],
+                "context": self._config.context,
+            },
+        )
+        if self._allowed_projects:
+            result = [r for r in result if r["id"] in self._allowed_projects]
+        return result
+
     async def search_tasks(
         self,
         domain: list[Any] | None = None,
@@ -242,6 +313,31 @@ class OdooProtocol:
                 "domain": [["project_ids", "=", project_id]],
                 "fields": ["display_name", "fold"],
                 "context": self._config.context,
+            },
+        )
+
+    async def post_message(
+        self,
+        task_id: int,
+        body: str,
+        message_type: str = "comment",
+        subtype: str = "mail.mt_comment",
+    ) -> dict[str, Any]:
+        context = {
+            **self._config.context,
+            "mail_post_autofollow": True,
+        }
+        return await self._transport.call(
+            "/mail/message/post",
+            {
+                "thread_id": task_id,
+                "thread_model": "project.task",
+                "post_data": {
+                    "body": body,
+                    "message_type": message_type,
+                    "subtype_xmlid": subtype,
+                },
+                "context": context,
             },
         )
 

@@ -14,7 +14,7 @@ from mcp_odoo_jsonrpc.acl.protocol import (
 )
 from mcp_odoo_jsonrpc.acl.transport import OdooTransport
 from mcp_odoo_jsonrpc.config import OdooConfig
-from mcp_odoo_jsonrpc.domain.models import Stage, Task
+from mcp_odoo_jsonrpc.domain.models import Project, Stage, Tag, Task
 
 
 class OdooTaskService:
@@ -33,6 +33,32 @@ class OdooTaskService:
 
     async def validate_session(self) -> dict[str, Any]:
         return await self._protocol.validate_session()
+
+    async def list_projects(self) -> list[Project]:
+        raw = await self._protocol.list_projects()
+        return [
+            Project(
+                id=r["id"],
+                name=r.get("display_name", ""),
+                task_count=r.get("task_count", 0),
+            )
+            for r in raw
+        ]
+
+    async def search_tags(
+        self,
+        project_id: int | None = None,
+        query: str = "",
+    ) -> list[Tag]:
+        raw = await self._protocol.search_tags(project_id=project_id, query=query)
+        return [
+            Tag(
+                id=r["id"],
+                name=r.get("display_name", ""),
+                color=r.get("color", 0),
+            )
+            for r in raw
+        ]
 
     async def list_tasks(
         self,
@@ -100,6 +126,7 @@ class OdooTaskService:
         description: str | None = None,
         priority: str | None = None,
         deadline: str | None = None,
+        allocated_hours: float | None = None,
         assignee_ids: list[int] | None = None,
         tag_ids: list[int] | None = None,
     ) -> Task:
@@ -112,6 +139,8 @@ class OdooTaskService:
             values["priority"] = priority
         if deadline is not None:
             values["date_deadline"] = deadline
+        if allocated_hours is not None:
+            values["allocated_hours"] = allocated_hours
         if assignee_ids is not None:
             values["user_ids"] = [[6, 0, assignee_ids]]
         if tag_ids is not None:
@@ -160,6 +189,25 @@ class OdooTaskService:
             specification=spec,
         )
         return translate_task(record)
+
+    async def post_comment(
+        self,
+        task_id: int,
+        body: str,
+        internal: bool = False,
+    ) -> dict:
+        subtype = "mail.mt_note" if internal else "mail.mt_comment"
+        msg_type = "comment"
+        result = await self._protocol.post_message(
+            task_id=task_id,
+            body=body,
+            message_type=msg_type,
+            subtype=subtype,
+        )
+        messages = result.get("mail.message", [])
+        if messages:
+            return messages[0]
+        return result
 
     async def get_timesheets(self, task_id: int) -> Task:
         record = await self._protocol.read_task(task_id)

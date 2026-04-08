@@ -67,6 +67,16 @@ def _format_task(task: Task, restricted: bool) -> str:
         lines.append(f"Подзадачи: {task.closed_subtask_count}/{task.subtask_count}")
     if task.description:
         lines.append(f"\n## Описание\n{task.description}")
+    if task.subtasks:
+        lines.append("\n## Подзадачи")
+        for st in task.subtasks:
+            assignee = ", ".join(u.name for u in st.assignees) if st.assignees else ""
+            dl = f" | Дедлайн: {st.deadline}" if st.deadline else ""
+            lines.append(
+                f"- [{st.id}] {st.name} "
+                f"| {st.stage.name} "
+                f"| {st.priority.name}{dl}" + (f" | {assignee}" if assignee else "")
+            )
     if task.timesheets:
         lines.append("\n## Трудозатраты")
         for ts in task.timesheets:
@@ -88,6 +98,99 @@ def _format_task(task: Task, restricted: bool) -> str:
         for att in task.attachments:
             lines.append(f"- {att.name} ({att.mimetype}, {att.size} байт)")
     return "\n".join(lines)
+
+
+# --- Resources (read-only) ---
+
+
+@mcp.resource("odoo://projects")
+async def resource_projects() -> str:
+    """Список доступных проектов Odoo."""
+    svc = _get_service()
+    projects = await svc.list_projects()
+    lines = [f"Проекты ({len(projects)}):"]
+    for p in projects:
+        lines.append(f"- ID {p.id} | {p.name} | {p.task_count} задач")
+    return "\n".join(lines)
+
+
+@mcp.resource("odoo://project/{project_id}/stages")
+async def resource_project_stages(project_id: int) -> str:
+    """Стадии (Kanban-колонки) проекта."""
+    svc = _get_service()
+    try:
+        stages = await svc.get_task_stages(project_id)
+    except PermissionError as e:
+        return f"Ошибка доступа: {e}"
+    except Exception as e:
+        return f"Ошибка: проект {project_id} не найден или недоступен. {e}"
+    if not stages:
+        return f"Проект {project_id}: стадии не найдены."
+    lines = [f"Стадии проекта {project_id}:"]
+    for s in stages:
+        fold = " (свёрнута)" if s.folded else ""
+        lines.append(f"- ID {s.id} | {s.name}{fold}")
+    return "\n".join(lines)
+
+
+@mcp.resource("odoo://project/{project_id}/tags")
+async def resource_project_tags(project_id: int) -> str:
+    """Теги, доступные в проекте."""
+    svc = _get_service()
+    try:
+        tags = await svc.search_tags(project_id=project_id)
+    except PermissionError as e:
+        return f"Ошибка доступа: {e}"
+    except Exception as e:
+        return f"Ошибка: {e}"
+    if not tags:
+        return f"Проект {project_id}: теги не найдены."
+    lines = [f"Теги проекта {project_id}:"]
+    for t in tags:
+        lines.append(f"- ID {t.id} | {t.name} | цвет {t.color}")
+    return "\n".join(lines)
+
+
+@mcp.resource("odoo://task/{task_id}")
+async def resource_task(task_id: int) -> str:
+    """Данные задачи (read-only)."""
+    svc = _get_service()
+    try:
+        task = await svc.get_task(task_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
+    return _format_task(task, restricted=svc.is_restricted)
+
+
+@mcp.resource("odoo://task/{task_id}/timesheets")
+async def resource_task_timesheets(task_id: int) -> str:
+    """Трудозатраты задачи (read-only)."""
+    svc = _get_service()
+    try:
+        task = await svc.get_timesheets(task_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
+    restricted = svc.is_restricted
+    lines = [
+        f"Трудозатраты по "
+        f"{'ID ' + str(task.id) if restricted else '[' + str(task.id) + '] ' + task.name}",
+        f"Часы: {task.effective_hours:.1f}/{task.allocated_hours:.1f}"
+        f" | Прогресс: {task.progress:.0%}",
+    ]
+    if not task.timesheets:
+        lines.append("Записей нет.")
+    else:
+        for ts in task.timesheets:
+            if restricted:
+                lines.append(f"- {ts.date} | {ts.hours:.2f}ч")
+            else:
+                lines.append(
+                    f"- {ts.date} | {ts.employee.name} | {ts.hours:.2f}ч | {ts.description}"
+                )
+    return "\n".join(lines)
+
+
+# --- Tools (read-write) ---
 
 
 @mcp.tool()
@@ -181,6 +284,7 @@ async def update_task(
     description: str | None = None,
     priority: str | None = None,
     deadline: str | None = None,
+    allocated_hours: float | None = None,
     assignee_ids: list[int] | None = None,
     tag_ids: list[int] | None = None,
 ) -> str:
@@ -192,6 +296,7 @@ async def update_task(
         description: Новое описание
         priority: Приоритет ("0" — обычный, "1" — срочный)
         deadline: Дедлайн (формат YYYY-MM-DD или None для сброса)
+        allocated_hours: Запланированные часы (например 5.0, 9.0)
         assignee_ids: Новый список исполнителей (заменяет текущих)
         tag_ids: Новый список тегов (заменяет текущие)
     """
@@ -202,6 +307,7 @@ async def update_task(
         description=description,
         priority=priority,
         deadline=deadline,
+        allocated_hours=allocated_hours,
         assignee_ids=assignee_ids,
         tag_ids=tag_ids,
     )
@@ -264,6 +370,26 @@ async def log_timesheet(
         f"| Описание: {description}\n"
         f"Итого: {task.effective_hours:.1f}ч"
     )
+
+
+@mcp.tool()
+async def post_comment(
+    task_id: int,
+    body: str,
+    internal: bool = False,
+) -> str:
+    """Оставить комментарий к задаче.
+
+    Args:
+        task_id: ID задачи
+        body: Текст комментария
+        internal: Внутренняя заметка (True) или публичный комментарий (False)
+    """
+    svc = _get_service()
+    msg = await svc.post_comment(task_id=task_id, body=body, internal=internal)
+    msg_id = msg.get("id", "?")
+    note_type = "Заметка" if internal else "Комментарий"
+    return f"{note_type} #{msg_id} добавлен к задаче {task_id}"
 
 
 @mcp.tool()
