@@ -6,13 +6,15 @@ SENSITIVE_PATTERNS: list[str] = [
     "пароль",
     "пароли",
     "парол",
-    "доступ",
     "credentials",
     "secret",
     "token",
-    r"api\.key",
-    r"ssh\.key",
-    r"private\.key",
+    r"api[\.\-_]key",
+    r"ssh[\.\-_]key",
+    r"private[\.\-_]key",
+    r"данные\s+для\s+входа",
+    r"учётные\s+данные",
+    r"ключ\s+доступа",
 ]
 
 _SENSITIVE_RE = re.compile("|".join(SENSITIVE_PATTERNS), re.IGNORECASE)

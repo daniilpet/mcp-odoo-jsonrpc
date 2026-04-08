@@ -10,13 +10,15 @@ class TestIsSensitive:
             "Пароли серверов",
             "Серверные password",
             "CREDENTIALS для CI",
-            "API.key от Stripe",
+            "API-key от Stripe",
             "SSH.key доступ",
-            "Private.key сертификат",
+            "Private_key сертификат",
             "TOKEN аутентификации",
             "SECRET для JWT",
             "Пароль от WiFi",
-            "Доступ к серверу",
+            "Ключ доступа к API",
+            "Учётные данные продакшена",
+            "Данные для входа в панель",
         ],
     )
     def test_sensitive_name_detected(self, name: str) -> None:
@@ -30,6 +32,10 @@ class TestIsSensitive:
             "Настройка CI/CD",
             "Описание API endpoints",
             "Руководство пользователя",
+            "API доступен по адресу",
+            "Система недоступна",
+            "Обеспечение доступности",
+            "Предоставить доступ к документации",
         ],
     )
     def test_safe_name_not_detected(self, name: str) -> None:
@@ -53,3 +59,9 @@ class TestIsSensitive:
     def test_case_insensitive(self) -> None:
         assert is_sensitive("PASSWORD MANAGEMENT") is True
         assert is_sensitive("Парол от базы") is True
+
+    def test_content_with_access_keyword_safe(self) -> None:
+        assert is_sensitive("Доступность API", "Сервис доступен 24/7") is False
+
+    def test_content_with_credentials_pattern(self) -> None:
+        assert is_sensitive("Инфраструктура", "Учётные данные для SSH") is True

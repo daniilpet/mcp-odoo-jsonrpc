@@ -581,7 +581,10 @@ async def get_wiki_page(page_id: int) -> str:
         page_id: ID wiki-страницы
     """
     svc = _get_wiki_service()
-    page = await svc.get_page(page_id)
+    try:
+        page = await svc.get_page(page_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
     return _format_wiki_page(
         page,
         restricted=svc.is_restricted,
@@ -604,6 +607,8 @@ async def create_wiki_page(
     """
     svc = _get_wiki_service()
     page = await svc.create_page(name=name, parent_id=parent_id, content=content)
+    if svc.is_restricted:
+        return f"Wiki-страница создана: ID {page.id}"
     return (
         f"Wiki-страница создана: [{page.id}] {page.name}\n"
         f"Категория: {page.parent_name or parent_id}"
