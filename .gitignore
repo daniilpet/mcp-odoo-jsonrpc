@@ -14,3 +14,4 @@ dev/captured/
 .claude/
 .ruff_cache/
 .pytest_cache/
+.mcp.json
