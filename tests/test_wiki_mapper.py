@@ -137,3 +137,17 @@ class TestTranslateWikiHistory:
         assert h.page_id == 52
         assert h.page_name == ""
         assert h.author is None
+
+    def test_false_name_and_summary(self) -> None:
+        """Odoo возвращает False вместо пустой строки."""
+        record = {
+            "id": 99,
+            "page_id": {"id": 52, "display_name": "Page"},
+            "create_uid": {"id": 1, "display_name": "Admin"},
+            "create_date": "2026-04-08 12:00:00",
+            "name": False,
+            "summary": False,
+        }
+        h = translate_wiki_history(record)
+        assert h.name == ""
+        assert h.summary == ""

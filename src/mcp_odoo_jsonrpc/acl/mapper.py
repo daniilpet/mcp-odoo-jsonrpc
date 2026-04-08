@@ -209,8 +209,8 @@ def translate_wiki_history(record: dict[str, Any]) -> WikiPageHistory:
         page_name=page_name,
         author=_parse_ref(record.get("create_uid"), User),
         create_date=_parse_datetime(record.get("create_date")),
-        name=record.get("name", ""),
-        summary=record.get("summary", ""),
+        name=record.get("name") or "",
+        summary=record.get("summary") or "",
     )
 
 
