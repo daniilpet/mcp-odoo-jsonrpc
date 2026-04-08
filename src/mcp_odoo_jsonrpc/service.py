@@ -6,6 +6,7 @@ from mcp_odoo_jsonrpc.acl.mapper import (
     translate_messages,
     translate_stage,
     translate_task,
+    translate_wiki_page,
 )
 from mcp_odoo_jsonrpc.acl.protocol import (
     TASK_DETAIL_RESTRICTED_SPEC,
@@ -14,7 +15,7 @@ from mcp_odoo_jsonrpc.acl.protocol import (
 )
 from mcp_odoo_jsonrpc.acl.transport import OdooTransport
 from mcp_odoo_jsonrpc.config import OdooConfig
-from mcp_odoo_jsonrpc.domain.models import Project, Stage, Tag, Task
+from mcp_odoo_jsonrpc.domain.models import Project, Stage, Tag, Task, WikiPage
 
 
 class OdooTaskService:
@@ -212,6 +213,62 @@ class OdooTaskService:
     async def get_timesheets(self, task_id: int) -> Task:
         record = await self._protocol.read_task(task_id)
         return translate_task(record)
+
+    async def close(self) -> None:
+        await self._transport.close()
+
+
+class OdooWikiService:
+    def __init__(self, config: OdooConfig) -> None:
+        self._config = config
+        self._transport = OdooTransport(config)
+        self._protocol = OdooProtocol(self._transport, config)
+
+    @property
+    def is_restricted(self) -> bool:
+        return self._config.is_restricted
+
+    @property
+    def sensitive_filter_enabled(self) -> bool:
+        return self._config.wiki_sensitive_filter_enabled
+
+    async def list_pages(
+        self,
+        parent_id: int | None = None,
+        limit: int = 80,
+    ) -> list[WikiPage]:
+        result = await self._protocol.list_wiki_pages(parent_id=parent_id, limit=limit)
+        records = result.get("records", [])
+        return [translate_wiki_page(r) for r in records]
+
+    async def get_page(self, page_id: int) -> WikiPage:
+        record = await self._protocol.read_wiki_page(page_id)
+        return translate_wiki_page(record)
+
+    async def search_pages(
+        self,
+        query: str,
+        limit: int = 40,
+    ) -> list[WikiPage]:
+        result = await self._protocol.search_wiki_pages(query=query, limit=limit)
+        records = result.get("records", [])
+        return [translate_wiki_page(r) for r in records]
+
+    async def create_page(
+        self,
+        name: str,
+        parent_id: int,
+        content: str | None = None,
+    ) -> WikiPage:
+        values: dict[str, Any] = {
+            "name": name,
+            "parent_id": parent_id,
+            "type": "content",
+        }
+        if content is not None:
+            values["content"] = content
+        record = await self._protocol.save_wiki_page(values=values, parent_id=parent_id)
+        return translate_wiki_page(record)
 
     async def close(self) -> None:
         await self._transport.close()

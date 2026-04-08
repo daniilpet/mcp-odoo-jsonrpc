@@ -1,19 +1,24 @@
+import re
+
 from mcp.server.fastmcp import FastMCP
 
 from mcp_odoo_jsonrpc.config import OdooConfig
-from mcp_odoo_jsonrpc.domain.models import Task
-from mcp_odoo_jsonrpc.service import OdooTaskService
+from mcp_odoo_jsonrpc.domain.enums import WikiPageType
+from mcp_odoo_jsonrpc.domain.models import Task, WikiPage
+from mcp_odoo_jsonrpc.domain.sensitive import is_sensitive
+from mcp_odoo_jsonrpc.service import OdooTaskService, OdooWikiService
 
 mcp = FastMCP(
-    "Odoo Tasks",
+    "Odoo",
     instructions=(
-        "MCP-сервер для управления задачами в Odoo ERP. "
-        "Позволяет просматривать, создавать и обновлять задачи, "
-        "менять стадии и списывать трудозатраты."
+        "MCP-сервер для Odoo ERP. "
+        "Позволяет управлять задачами, трудозатратами и wiki-страницами. "
+        "Wiki-контент с чувствительными данными (пароли, ключи) цензурируется автоматически."
     ),
 )
 
 _service: OdooTaskService | None = None
+_wiki_service: OdooWikiService | None = None
 
 
 def _get_service() -> OdooTaskService:
@@ -21,6 +26,76 @@ def _get_service() -> OdooTaskService:
     if _service is None:
         _service = OdooTaskService(OdooConfig.auto())
     return _service
+
+
+def _get_wiki_service() -> OdooWikiService:
+    global _wiki_service
+    if _wiki_service is None:
+        _wiki_service = OdooWikiService(OdooConfig.auto())
+    return _wiki_service
+
+
+_STRIP_HTML_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(html: str) -> str:
+    return _STRIP_HTML_RE.sub("", html).strip()
+
+
+def _format_wiki_page(page: WikiPage, restricted: bool, sensitive_filter: bool) -> str:
+    # Матрица состояний — ADR-009
+    # restricted=True  → метаданные, без тела (строки 1-2)
+    # restricted=False, sensitive=False → всё (строка 3)
+    # restricted=False, sensitive=True  → метаданные + причина цензуры (строка 4)
+
+    sensitive = sensitive_filter and is_sensitive(page.name, page.content)
+
+    lines = [f"# {page.name}"]
+    lines.append(f"ID: {page.id} | Тип: {page.type.value}")
+    if page.parent_name:
+        lines.append(f"Категория: {page.parent_name}")
+    if page.write_date:
+        lines.append(f"Изменено: {page.write_date:%Y-%m-%d %H:%M}")
+    if page.content_uid:
+        lines.append(f"Автор: {page.content_uid.name}")
+    lines.append(f"Ссылка: odoo://wiki/{page.id}")
+
+    if restricted:
+        lines.append("\nВозможно, здесь об этом написано.")
+        return "\n".join(lines)
+
+    if sensitive:
+        lines.append(
+            "\nСодержимое скрыто: обнаружены чувствительные данные "
+            "(пароли, ключи доступа или аналогичная информация)."
+        )
+        return "\n".join(lines)
+
+    if page.content:
+        lines.append(f"\n## Содержимое\n{_strip_html(page.content)}")
+
+    if page.history:
+        lines.append("\n## История изменений")
+        for h in page.history:
+            author = h.author.name if h.author else "—"
+            date_str = f"{h.create_date:%Y-%m-%d %H:%M}" if h.create_date else "—"
+            summary = h.summary or "без описания"
+            lines.append(f"- [{date_str}] {author}: {summary}")
+
+    return "\n".join(lines)
+
+
+def _format_wiki_list(pages: list[WikiPage], restricted: bool) -> str:
+    if not pages:
+        return "Wiki-страниц не найдено."
+
+    lines = [f"Wiki ({len(pages)}):"]
+    for p in pages:
+        icon = "📁" if p.type == WikiPageType.CATEGORY else "📄"
+        date_str = f" | {p.write_date:%Y-%m-%d}" if p.write_date else ""
+        parent = f" | {p.parent_name}" if p.parent_name else ""
+        lines.append(f"- {icon} ID {p.id} | {p.name}{parent}{date_str}")
+    return "\n".join(lines)
 
 
 def _format_task(task: Task, restricted: bool) -> str:
@@ -435,3 +510,121 @@ async def get_timesheets(task_id: int) -> str:
                 )
 
     return "\n".join(lines)
+
+
+# --- Wiki Resources (read-only) ---
+
+
+@mcp.resource("odoo://wiki/categories")
+async def resource_wiki_categories() -> str:
+    """Корневые категории wiki (document.page)."""
+    svc = _get_wiki_service()
+    try:
+        pages = await svc.list_pages(parent_id=None)
+    except Exception as e:
+        return f"Ошибка: модуль wiki (document.page) недоступен. {e}"
+    categories = [p for p in pages if p.type == WikiPageType.CATEGORY]
+    return _format_wiki_list(categories, restricted=svc.is_restricted)
+
+
+@mcp.resource("odoo://wiki/category/{category_id}")
+async def resource_wiki_category(category_id: int) -> str:
+    """Содержимое категории wiki — подкатегории и страницы."""
+    svc = _get_wiki_service()
+    try:
+        pages = await svc.list_pages(parent_id=category_id)
+    except Exception as e:
+        return f"Ошибка: {e}"
+    return _format_wiki_list(pages, restricted=svc.is_restricted)
+
+
+@mcp.resource("odoo://wiki/{page_id}")
+async def resource_wiki_page(page_id: int) -> str:
+    """Содержимое wiki-страницы (с учётом режима доверия и фильтра)."""
+    svc = _get_wiki_service()
+    try:
+        page = await svc.get_page(page_id)
+    except (ValueError, Exception) as e:
+        return f"Ошибка: {e}"
+    return _format_wiki_page(
+        page,
+        restricted=svc.is_restricted,
+        sensitive_filter=svc.sensitive_filter_enabled,
+    )
+
+
+# --- Wiki Tools ---
+
+
+@mcp.tool()
+async def list_wiki_pages(parent_id: int | None = None) -> str:
+    """Получить список wiki-страниц и категорий.
+
+    Args:
+        parent_id: ID родительской категории (None — корневые)
+    """
+    svc = _get_wiki_service()
+    try:
+        pages = await svc.list_pages(parent_id=parent_id)
+    except Exception as e:
+        return f"Ошибка: модуль wiki (document.page) недоступен. {e}"
+    return _format_wiki_list(pages, restricted=svc.is_restricted)
+
+
+@mcp.tool()
+async def get_wiki_page(page_id: int) -> str:
+    """Получить содержимое wiki-страницы.
+
+    Чувствительный контент (пароли, ключи) цензурируется автоматически.
+
+    Args:
+        page_id: ID wiki-страницы
+    """
+    svc = _get_wiki_service()
+    try:
+        page = await svc.get_page(page_id)
+    except (ValueError, PermissionError) as e:
+        return f"Ошибка: {e}"
+    return _format_wiki_page(
+        page,
+        restricted=svc.is_restricted,
+        sensitive_filter=svc.sensitive_filter_enabled,
+    )
+
+
+@mcp.tool()
+async def create_wiki_page(
+    name: str,
+    parent_id: int,
+    content: str | None = None,
+) -> str:
+    """Создать wiki-страницу в указанной категории.
+
+    Args:
+        name: Название страницы
+        parent_id: ID родительской категории
+        content: Содержимое (HTML или текст, необязательно)
+    """
+    svc = _get_wiki_service()
+    page = await svc.create_page(name=name, parent_id=parent_id, content=content)
+    if svc.is_restricted:
+        return f"Wiki-страница создана: ID {page.id}"
+    return (
+        f"Wiki-страница создана: [{page.id}] {page.name}\n"
+        f"Категория: {page.parent_name or parent_id}"
+    )
+
+
+@mcp.tool()
+async def search_wiki(query: str) -> str:
+    """Поиск wiki-страниц по названию.
+
+    Args:
+        query: Поисковый запрос (часть названия)
+    """
+    svc = _get_wiki_service()
+    try:
+        pages = await svc.search_pages(query=query)
+    except Exception as e:
+        return f"Ошибка: {e}"
+    return _format_wiki_list(pages, restricted=svc.is_restricted)

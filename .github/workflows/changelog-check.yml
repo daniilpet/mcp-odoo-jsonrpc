@@ -1,0 +1,41 @@
+name: Changelog Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Verify CHANGELOG updated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CHANGELOG.md was modified
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" -- CHANGELOG.md)
+          if [ -z "$CHANGED" ]; then
+            echo "::error::CHANGELOG.md не обновлён. PR в main должен содержать запись в CHANGELOG."
+            exit 1
+          fi
+          echo "CHANGELOG.md обновлён."
+
+      - name: Check version in CHANGELOG matches branch
+        if: startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          VERSION="${BRANCH#release/}"
+          VERSION="${VERSION#hotfix/}"
+          if ! grep -q "\[${VERSION}\]" CHANGELOG.md; then
+            echo "::error::Секция [$VERSION] не найдена в CHANGELOG.md"
+            exit 1
+          fi
+          echo "Секция [$VERSION] найдена в CHANGELOG.md."
