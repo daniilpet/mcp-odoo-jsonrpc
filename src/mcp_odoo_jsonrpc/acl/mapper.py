@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState
+from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState, WikiPageType
 from mcp_odoo_jsonrpc.domain.models import (
     Attachment,
     FieldChange,
@@ -16,6 +16,8 @@ from mcp_odoo_jsonrpc.domain.models import (
     TaskRef,
     Timesheet,
     User,
+    WikiPage,
+    WikiPageHistory,
 )
 
 
@@ -188,3 +190,56 @@ def translate_attachments(raw: dict[str, Any]) -> list[Attachment]:
             )
         )
     return attachments
+
+
+def translate_wiki_history(record: dict[str, Any]) -> WikiPageHistory:
+    page_ref = record.get("page_id")
+    page_id = 0
+    page_name = ""
+    if page_ref and page_ref is not False:
+        if isinstance(page_ref, dict):
+            page_id = page_ref.get("id", 0)
+            page_name = page_ref.get("display_name", "")
+        elif isinstance(page_ref, int):
+            page_id = page_ref
+
+    return WikiPageHistory(
+        id=record["id"],
+        page_id=page_id,
+        page_name=page_name,
+        author=_parse_ref(record.get("create_uid"), User),
+        create_date=_parse_datetime(record.get("create_date")),
+        name=record.get("name") or "",
+        summary=record.get("summary") or "",
+    )
+
+
+def translate_wiki_page(record: dict[str, Any]) -> WikiPage:
+    parent_ref = record.get("parent_id")
+    parent_id = None
+    parent_name = None
+    if parent_ref and parent_ref is not False:
+        if isinstance(parent_ref, dict):
+            parent_id = parent_ref.get("id")
+            parent_name = parent_ref.get("display_name")
+        elif isinstance(parent_ref, int):
+            parent_id = parent_ref
+
+    history = []
+    for h in record.get("history_ids") or []:
+        history.append(translate_wiki_history(h))
+
+    return WikiPage(
+        id=record["id"],
+        name=record.get("name", ""),
+        type=WikiPageType.from_odoo(record.get("type", "content")),
+        parent_id=parent_id,
+        parent_name=parent_name,
+        write_date=_parse_datetime(record.get("write_date")),
+        create_uid=_parse_ref(record.get("create_uid"), User),
+        content_uid=_parse_ref(record.get("content_uid"), User),
+        content=record.get("content") or None,
+        content_date=_parse_datetime(record.get("content_date")),
+        color=record.get("color", 0),
+        history=history,
+    )

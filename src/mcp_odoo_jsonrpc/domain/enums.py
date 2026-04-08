@@ -56,3 +56,16 @@ class MessageType(StrEnum):
             is_discussion,
         )
         return cls.NOTIFICATION
+
+
+class WikiPageType(StrEnum):
+    CATEGORY = "category"
+    CONTENT = "content"
+
+    @classmethod
+    def from_odoo(cls, value: str) -> "WikiPageType":
+        for member in cls:
+            if member.value == value:
+                return member
+        logger.warning("Unknown WikiPageType: %r — defaulting to CONTENT", value)
+        return cls.CONTENT

@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
-from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState
+from mcp_odoo_jsonrpc.domain.enums import MessageType, TaskPriority, TaskState, WikiPageType
 
 
 class Project(BaseModel, frozen=True):
@@ -115,3 +115,28 @@ class Task(BaseModel, frozen=True):
     timesheets: list[Timesheet] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
     attachments: list[Attachment] = Field(default_factory=list)
+
+
+class WikiPageHistory(BaseModel, frozen=True):
+    id: int
+    page_id: int = 0
+    page_name: str = ""
+    author: User | None = None
+    create_date: datetime | None = None
+    name: str = ""
+    summary: str = ""
+
+
+class WikiPage(BaseModel, frozen=True):
+    id: int
+    name: str
+    type: WikiPageType
+    parent_id: int | None = None
+    parent_name: str | None = None
+    write_date: datetime | None = None
+    create_uid: User | None = None
+    content_uid: User | None = None
+    content: str | None = None
+    content_date: datetime | None = None
+    color: int = 0
+    history: list[WikiPageHistory] = Field(default_factory=list)

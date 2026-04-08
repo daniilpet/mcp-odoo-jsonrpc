@@ -147,6 +147,17 @@ def _parse_trust_mode() -> TrustMode:
         return TrustMode.RESTRICTED
 
 
+def _parse_wiki_sensitive_filter() -> bool:
+    raw = os.environ.get("ODOO_WIKI_SENSITIVE_FILTER", "").strip().lower()
+    if raw == "off":
+        logger.warning(
+            "ODOO_WIKI_SENSITIVE_FILTER=off — фильтр чувствительных данных wiki ОТКЛЮЧЁН. "
+            "Пароли и секреты могут быть видны AI-агенту."
+        )
+        return False
+    return True
+
+
 def _parse_allowed_projects() -> list[int] | None:
     raw = os.environ.get("ODOO_ALLOWED_PROJECTS", "").strip()
     if not raw:
@@ -166,6 +177,7 @@ class OdooConfig:
         self._allowed_project_ids = (
             allowed_project_ids if allowed_project_ids is not None else _parse_allowed_projects()
         )
+        self._wiki_sensitive_filter = _parse_wiki_sensitive_filter()
 
     @classmethod
     def from_session_file(
@@ -203,6 +215,10 @@ class OdooConfig:
     @property
     def allowed_project_ids(self) -> list[int] | None:
         return self._allowed_project_ids
+
+    @property
+    def wiki_sensitive_filter_enabled(self) -> bool:
+        return self._wiki_sensitive_filter
 
     @property
     def base_url(self) -> str:

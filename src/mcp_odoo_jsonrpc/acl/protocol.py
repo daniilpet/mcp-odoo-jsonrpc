@@ -114,6 +114,43 @@ TASK_SAVE_RESTRICTED_SPEC: dict[str, Any] = {
     "is_closed": {},
 }
 
+# --- Wiki (document.page) specifications ---
+
+WIKI_LIST_SPEC: dict[str, Any] = {
+    "name": {},
+    "display_name": {},
+    "type": {},
+    "color": {},
+    "write_date": {},
+    "parent_id": {"fields": {"display_name": {}}},
+    "create_uid": {"fields": {"display_name": {}}},
+    "content_uid": {"fields": {"display_name": {}}},
+}
+
+WIKI_DETAIL_SPEC: dict[str, Any] = {
+    **WIKI_LIST_SPEC,
+    "content": {},
+    "content_date": {},
+    "history_ids": {
+        "fields": {
+            "create_uid": {"fields": {"display_name": {}}},
+            "create_date": {},
+            "name": {},
+            "summary": {},
+        },
+        "limit": 50,
+        "order": "create_date DESC",
+    },
+}
+
+WIKI_DETAIL_RESTRICTED_SPEC: dict[str, Any] = {
+    **WIKI_LIST_SPEC,
+}
+
+WIKI_SAVE_RESULT_SPEC: dict[str, Any] = {
+    **WIKI_DETAIL_SPEC,
+}
+
 
 class OdooProtocol:
     def __init__(self, transport: OdooTransport, config: OdooConfig) -> None:
@@ -372,3 +409,93 @@ class OdooProtocol:
                 "thread_model": "project.task",
             },
         )
+
+    # --- Wiki (document.page) ---
+
+    async def list_wiki_pages(
+        self,
+        parent_id: int | None = None,
+        limit: int = 80,
+    ) -> dict[str, Any]:
+        if parent_id is not None:
+            domain: list[Any] = [["parent_id", "=", parent_id]]
+        else:
+            domain = [["parent_id", "=", False]]
+
+        return await self._transport.call_kw(
+            model="document.page",
+            method="web_search_read",
+            args=[],
+            kwargs={
+                "specification": WIKI_LIST_SPEC,
+                "domain": domain,
+                "limit": limit,
+                "order": "type ASC, name ASC",
+                "context": self._config.context,
+                "count_limit": 10001,
+            },
+        )
+
+    async def read_wiki_page(self, page_id: int) -> dict[str, Any]:
+        spec = WIKI_DETAIL_RESTRICTED_SPEC if self.is_restricted else WIKI_DETAIL_SPEC
+
+        result = await self._transport.call_kw(
+            model="document.page",
+            method="web_search_read",
+            args=[],
+            kwargs={
+                "specification": spec,
+                "domain": [["id", "=", page_id]],
+                "limit": 1,
+                "context": self._config.context,
+                "count_limit": 1,
+            },
+        )
+        records = result.get("records", [])
+        if not records:
+            raise ValueError(f"Wiki-страница с id={page_id} не найдена")
+        return records[0]
+
+    async def search_wiki_pages(
+        self,
+        query: str,
+        limit: int = 40,
+    ) -> dict[str, Any]:
+        return await self._transport.call_kw(
+            model="document.page",
+            method="web_search_read",
+            args=[],
+            kwargs={
+                "specification": WIKI_LIST_SPEC,
+                "domain": [["name", "ilike", query]],
+                "limit": limit,
+                "order": "type ASC, write_date DESC",
+                "context": self._config.context,
+                "count_limit": 10001,
+            },
+        )
+
+    async def save_wiki_page(
+        self,
+        values: dict[str, Any],
+        parent_id: int | None = None,
+    ) -> dict[str, Any]:
+        context = {
+            **self._config.context,
+            "default_type": "content",
+        }
+        if parent_id is not None:
+            context["default_parent_id"] = parent_id
+
+        result = await self._transport.call_kw(
+            model="document.page",
+            method="web_save",
+            args=[[], values],
+            kwargs={
+                "context": context,
+                "specification": WIKI_SAVE_RESULT_SPEC,
+            },
+        )
+        if not result:
+            raise RuntimeError("web_save для wiki вернул пустой результат")
+        return result[0]
