@@ -96,6 +96,8 @@ docker build -t mcp-odoo .
 
 ## Возможности
 
+### Задачи и трудозатраты
+
 | Инструмент           | Описание                                     |
 |----------------------|----------------------------------------------|
 | `list_tasks`         | Получение списка задач пользователя          |
@@ -105,6 +107,15 @@ docker build -t mcp-odoo .
 | `change_task_stage`  | Смена стадии/статуса задачи                  |
 | `log_timesheet`      | Списание трудозатрат по задаче               |
 | `get_timesheets`     | Получение трудозатрат по задаче              |
+
+### Wiki (document.page)
+
+| Инструмент           | Описание                                     |
+|----------------------|----------------------------------------------|
+| `list_wiki_pages`    | Список wiki-страниц и категорий              |
+| `get_wiki_page`      | Содержимое страницы (с фильтром секретов)    |
+| `create_wiki_page`   | Создание wiki-страницы в категории           |
+| `search_wiki`        | Поиск страниц по названию                    |
 
 ## Безопасность
 
@@ -119,6 +130,8 @@ MCP-сервер работает в **restricted mode** по умолчанию
 Дополнительные меры:
 
 - **Фильтр проектов**: `ODOO_ALLOWED_PROJECTS=99,101` — ограничить видимые проекты
+- **Wiki: фильтр секретов**: страницы с паролями, ключами и токенами
+  цензурируются автоматически даже в full mode ([ADR-009](docs/adr/009-wiki-sensitive-filter.md))
 - **Secure credentials**: `session_id` хранится в системном keyring, не в plaintext
 - **detect-secrets**: pre-commit hook предотвращает случайный коммит секретов
 - **CLI**: всегда работает в full mode (пользователь смотрит в свой терминал)
@@ -187,9 +200,9 @@ Service Layer (OdooTaskService)
 | Документ | Описание |
 |----------|----------|
 | [Context Map](docs/architecture/context-map.md) | Архитектура и DDD-паттерны |
-| [Domain Model](docs/architecture/domain-model.md) | 11 доменных объектов |
+| [Domain Model](docs/architecture/domain-model.md) | 14 доменных объектов |
 | [JSON-RPC Reference](docs/api/odoo-jsonrpc-reference.md) | 9 задокументированных эндпоинтов |
-| [ADR](docs/adr/README.md) | 6 архитектурных решений |
+| [ADR](docs/adr/README.md) | 9 архитектурных решений |
 | [CONTRIBUTING](CONTRIBUTING.md) | Как внести вклад |
 | [SECURITY](SECURITY.md) | Политика безопасности |
 
